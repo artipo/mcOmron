@@ -39,6 +39,7 @@
     <Compile Include="BytesTools.cs" />
     <Compile Include="FINSCommands\IFinsCommand.cs" />
     <Compile Include="FINSCommands\tcpFinsCommand.cs" />
+    <Compile Include="FINSCommands\udpFinsCommand.cs" />
     <Compile Include="OmronPLC.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TransportLayer\ITransport.cs" />

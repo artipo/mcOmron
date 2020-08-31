@@ -1,4 +1,5 @@
-﻿using System;
+﻿using mcOMRON;
+using System;
 using System.Net;
 using System.Text;
 using System.Windows.Forms;
@@ -11,7 +12,6 @@ namespace test_plc
 		//
 		mcOMRON.OmronPLC plc;
 
-
 		/// <summary>
 		/// constructor
 		/// </summary>
@@ -19,27 +19,106 @@ namespace test_plc
 		{
 			InitializeComponent();
 
-			// initielize a new plc object with tcp transport layer
-			//
-			this.plc = new mcOMRON.OmronPLC(mcOMRON.TransportType.Tcp);
+			InitDataSources();
+		}
+
+		
+		#region **** init data sources
+
+		
+		private void InitDataSources()
+		{
+			InitProtocolDataSource();
+			InitWordMemoryAreaDataSource();
+			InitBitMemoryAreaDataSource();
+		}
+
+		
+		private void InitProtocolDataSource()
+		{
+			var protocols = Enum.GetValues(typeof(mcOMRON.TransportType));
+
+			transport_type.DataSource = protocols;
+			transport_type.SelectedItem = mcOMRON.TransportType.Tcp;
+		}
+
+		
+		private void InitWordMemoryAreaDataSource()
+		{
+			MemoryArea[] memoryAreas = new[]
+			{
+				MemoryArea.CIO,
+				MemoryArea.WR,
+				MemoryArea.HR,
+				MemoryArea.AR,
+				MemoryArea.TIM,
+				MemoryArea.CNT,
+				MemoryArea.CNT,
+				MemoryArea.DM,
+				MemoryArea.TK
+			};
+			
+			word_memory_area.DataSource = memoryAreas;
+			word_memory_area.SelectedItem = MemoryArea.DM;
 		}
 		
+		
+		private void InitBitMemoryAreaDataSource()
+		{
+			MemoryArea[] memoryAreas = new[]
+			{
+				MemoryArea.CIO_Bit,
+				MemoryArea.WR_Bit,
+				MemoryArea.HR_Bit,
+				MemoryArea.AR_Bit,
+				MemoryArea.DM_Bit,
+				MemoryArea.TK_Bit
+			};
+			
+			bit_memory_area.DataSource = memoryAreas;
+			bit_memory_area.SelectedItem = MemoryArea.DM_Bit;
+		}
 
+		
+		#endregion
+		
+		
 		/// <summary>
 		/// try to connect to the plc
 		/// </summary>
 		private void Connect()
 		{
-			if (ip.Text == "") return;
-			if (port.Text == "") return;
+			if (string.IsNullOrWhiteSpace(ip.Text) || string.IsNullOrWhiteSpace(port.Text))
+				return;
 
 			try
 			{
-				// set ip:port for command layer, may cast to tcpFINSCommand to set ip and port
-				//
-				mcOMRON.tcpFINSCommand tcpCommand = ((mcOMRON.tcpFINSCommand)plc.FinsCommand);
-				tcpCommand.SetTCPParams(IPAddress.Parse(ip.Text), Convert.ToInt32(port.Text));
+				mcOMRON.TransportType protocol = (mcOMRON.TransportType) transport_type.SelectedItem;
+				plc = new OmronPLC(protocol);
 				
+				IPAddress ipAddress = IPAddress.Parse(ip.Text);
+				int port = Convert.ToInt32(this.port.Text);
+				
+				switch(protocol)
+				{
+					case mcOMRON.TransportType.Tcp:
+						tcpFINSCommand tcpFinsCommand = (tcpFINSCommand) plc.FinsCommand;
+						tcpFinsCommand.SetTCPParams(ipAddress, port);
+						break;
+
+					case mcOMRON.TransportType.Udp:
+						if (string.IsNullOrWhiteSpace(source_node.Text) || string.IsNullOrWhiteSpace(destination_node.Text))
+							return;
+
+						int sa1 = Convert.ToInt32(source_node.Text);
+						int da1 = Convert.ToInt32(destination_node.Text);
+						
+						udpFINSCommand udpFinsCommand = (udpFINSCommand) plc.FinsCommand;
+						udpFinsCommand.SetUdpParams(ipAddress, port, sa1, da1);
+						
+						break;
+				}
+
 				// connection
 				//
 				if (! plc.Connect())
@@ -47,17 +126,27 @@ namespace test_plc
 					throw new Exception(plc.LastError);
 				}
 
+				if (protocol == mcOMRON.TransportType.Tcp)
+				{
+					tcpFINSCommand tcpFinsCommand = (tcpFINSCommand) plc.FinsCommand;
+					
+					destination_node.Text = tcpFinsCommand.DA1.ToString();
+					source_node.Text = tcpFinsCommand.SA1.ToString();
+				}
+
 				// set UI
 				//
 				bt_connect.Enabled = false;
 				ip.Enabled = false;
-				port.Enabled = false;
+				this.port.Enabled = false;
+				destination_node.Enabled = false;
+				source_node.Enabled = false;
+				transport_type.Enabled = false;
 				bt_close.Enabled = true;
 				bt_connection_data_read.Enabled = true;
-				groupDM.Enabled = true;
-				groupDMs.Enabled = true;
+				groupWord.Enabled = true;
+				groupBit.Enabled = true;
 				groupDialogText.Enabled = true;
-				groupCIO.Enabled = true;
 				dialog.Clear();
 			}
 			catch (Exception ex)
@@ -73,16 +162,19 @@ namespace test_plc
 		private void Shutdown()
 		{
 			plc.Close();
+			plc = null;
 
 			bt_connect.Enabled = true;
 			ip.Enabled = true;
 			port.Enabled = true;
+			transport_type.Enabled = true;
 			bt_close.Enabled = false;
 			bt_connection_data_read.Enabled = false;
-			groupDM.Enabled = false;
-			groupDMs.Enabled = false;
+			groupWord.Enabled = false;
+			groupBit.Enabled = false;
 			groupDialogText.Enabled = false;
-			groupCIO.Enabled = false;
+
+			UpdateNodesEnabled();
 		}
 		
 
@@ -97,56 +189,73 @@ namespace test_plc
 
 
 		/// <summary>
-		/// read a single DM
+		/// read a word
 		/// </summary>
-		private void ReadDM()
+		private void ReadWord()
 		{
-			if (dm_position.Text == "") return;
-			UInt16 dmval=0;
+			if (string.IsNullOrWhiteSpace(word_position.Text) ||
+			    string.IsNullOrWhiteSpace(word_count.Text))
+				return;
+			
+			UInt16 val = 0;
 
 			try
 			{
-				if (! plc.ReadDM(Convert.ToUInt16(dm_position.Text), ref dmval))
+				MemoryArea area = (MemoryArea) word_memory_area.SelectedItem;
+				UInt16 position = Convert.ToUInt16(word_position.Text);
+				UInt16 count = Convert.ToUInt16(word_count.Text);
+
+				if (! plc.finsMemoryAreadRead(area, position, 0, count))
 				{
 					throw new Exception(plc.LastError);
 				}
 
-				dm_value.Text = dmval.ToString();
+				val = BTool.BytesToUInt16(plc.FinsCommand.Response[0], plc.FinsCommand.Response[1]);
 
-				dialog.Text = plc.LastDialog("READ DM");
-				dialog.AppendText("DM VALUE: " + dmval.ToString());
+				word_value.Text = val.ToString();
+
+				dialog.Text = plc.LastDialog("READ WORD");
+				dialog.AppendText("WORD VALUE: " + val.ToString());
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("ReadDM() Error: " + ex.Message);
+				MessageBox.Show("ReadWord() Error: " + ex.Message);
 			}
 		}
 
 
 		/// <summary>
-		/// read some continous DM
+		/// read a single bit
 		/// </summary>
-		private void ReadDMs()
+		private void ReadBit()
 		{
-			if (dms_position.Text == "" || dms_count.Text == "") return;
-			UInt16 dmscount = 0;
-			UInt16 [] data;
+			if (string.IsNullOrWhiteSpace(bit_position.Text) ||
+			    string.IsNullOrWhiteSpace(bit_bit_position.Text)) return;
+
+			bool bitval;
 
 			try
 			{
-				dmscount = Convert.ToUInt16(dms_count.Text);
-				data = new UInt16[dmscount];
+				MemoryArea area = (MemoryArea) bit_memory_area.SelectedItem;
+				UInt16 position = Convert.ToUInt16(bit_position.Text);
+				byte bitpos = Convert.ToByte(bit_bit_position.Text);
+				
 
-				if (!plc.ReadDMs(Convert.ToUInt16(dms_position.Text), ref data, dmscount))
+				if (! plc.finsMemoryAreadRead(area, position, bitpos, 1))
 				{
 					throw new Exception(plc.LastError);
 				}
 
-				dialog.Text = plc.LastDialog("READ DM's");
+				bitval = Convert.ToBoolean(plc.FinsCommand.Response[0]);
+
+				bit_value.Checked = bitval;
+
+				dialog.Text = plc.LastDialog("READ BIT");
+				dialog.AppendText("BIT VALUE: " + bitval.ToString());
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("ReadDMs() error: " + ex.Message);
+				MessageBox.Show("ReadBit() error: " + ex.Message);
 			}
 		}
 
@@ -176,16 +285,19 @@ namespace test_plc
 
 
 		/// <summary>
-		/// write a single DM
+		/// write a single word
 		/// </summary>
-		private void WriteDM()
+		private void WriteWord()
 		{
-			if (dm_position.Text == "") return;
-			UInt16 dmval = 0;
+			if (string.IsNullOrWhiteSpace(word_position.Text) ||
+			    string.IsNullOrWhiteSpace(word_count.Text))
+				return;
+			
+			UInt16 val = 0;
 
 			try
 			{
-				dmval = Convert.ToUInt16(dm_value.Text);
+				val = Convert.ToUInt16(word_value.Text);
 
 				if (MessageBox.Show("This action will write some memory area of your PLC.\n\nContinue anyway?"
 								, "OMRON PLC text"
@@ -196,124 +308,105 @@ namespace test_plc
 					return;
 				}
 
-				if (!plc.WriteDM(Convert.ToUInt16(dm_position.Text), dmval))
-				{
-					throw new Exception(plc.LastError);
-				}
-
-				dialog.Text = plc.LastDialog("WRITE DM");
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show("WriteDM() error: " + ex.Message);
-			}
-		}
-
-
-		/// <summary>
-		/// clear some continous DM
-		/// </summary>
-		private void ClearDMs()
-		{
-			if (dms_position.Text == "" || dms_count.Text == "") return;
-			UInt16 dmscount = 0;
-
-			try
-			{
-				dmscount = Convert.ToUInt16(dms_count.Text);
-
-				if (MessageBox.Show("This action will write some memory area of your PLC.\n\nContinue anyway?"
-								, "OMRON PLC text"
-								, MessageBoxButtons.OKCancel
-								, MessageBoxIcon.Question
-								, MessageBoxDefaultButton.Button2) != System.Windows.Forms.DialogResult.OK)
-				{
+				var area = (MemoryArea) word_memory_area.SelectedItem;
+				var position = Convert.ToUInt16(word_position.Text);
+				var count = Convert.ToUInt16(word_count.Text);
+				var data = BTool.Uint16toBytes(val);
+				
+				if (count > 1)
 					return;
-				}
 
-				if (!plc.ClearDMs(Convert.ToUInt16(dms_position.Text), dmscount))
+				if (! plc.finsMemoryAreadWrite(area, position, 0, 1, data))
 				{
 					throw new Exception(plc.LastError);
 				}
 
-				dialog.Text = plc.LastDialog("CLEAR DM's");
+				dialog.Text = plc.LastDialog("WRITE WORD");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("ClearDMs() error: " + ex.Message);
+				MessageBox.Show("WriteWord() error: " + ex.Message);
 			}
 		}
-
 
 
 		/// <summary>
-		/// read a CIO bit
+		/// clear a single bit
 		/// </summary>
-		private void ReadCIOBit()
+		private void ClearBit()
 		{
-			if (this.cio_position.Text == "") return;
-			if (this.cio_bit.Text == "") return;
-			Byte cioval = 0;
+			if (string.IsNullOrWhiteSpace(bit_position.Text) ||
+			    string.IsNullOrWhiteSpace(bit_bit_position.Text)) return;
 
 			try
 			{
-				if (!plc.ReadCIOBit(Convert.ToUInt16(cio_position.Text), Convert.ToByte(cio_bit.Text), ref cioval))
+				MemoryArea area = (MemoryArea) bit_memory_area.SelectedItem;
+				UInt16 position = Convert.ToUInt16(bit_position.Text);
+				byte bitpos = Convert.ToByte(bit_bit_position.Text);
+				
+
+				if (! plc.finsMemoryAreadWrite(area, position, bitpos, 1, new []{(byte) 0}))
 				{
 					throw new Exception(plc.LastError);
 				}
 
-				cio_value.Text = cioval.ToString();
-
-				dialog.Text = plc.LastDialog("READ CIO Bit");
-				dialog.AppendText("CIO Bit VALUE: " + cioval.ToString());
+				dialog.Text = plc.LastDialog("CLEAR BIT");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("ReadCIOBit() Error: " + ex.Message);
+				MessageBox.Show("ReadBit() error: " + ex.Message);
 			}
 		}
-
-
-
+		
+		
 		/// <summary>
-		/// write a single CIO Bit
+		/// raise a single bit
 		/// </summary>
-		private void WriteCIOBit()
+		private void RaiseBit()
 		{
-			if (this.cio_position.Text == "") return;
-			if (this.cio_bit.Text == "") return;
-			Byte cioval = 0;
+			if (string.IsNullOrWhiteSpace(bit_position.Text) ||
+			    string.IsNullOrWhiteSpace(bit_bit_position.Text)) return;
 
 			try
 			{
-				cioval = Convert.ToByte(cio_value.Text);
+				MemoryArea area = (MemoryArea) bit_memory_area.SelectedItem;
+				UInt16 position = Convert.ToUInt16(bit_position.Text);
+				byte bitpos = Convert.ToByte(bit_bit_position.Text);
+				
 
-				if (cioval != 0 && cioval != 1)
-					throw new Exception("WriteCIOBit requires a range values between 0-1");
-
-				if (MessageBox.Show("This action will write some memory area of your PLC.\n\nContinue anyway?"
-								, "OMRON PLC text"
-								, MessageBoxButtons.OKCancel
-								, MessageBoxIcon.Question
-								, MessageBoxDefaultButton.Button2) != System.Windows.Forms.DialogResult.OK)
-				{
-					return;
-				}
-
-				if (!plc.WriteCIOBit(Convert.ToUInt16(cio_position.Text), Convert.ToByte(cio_bit.Text), cioval))
+				if (! plc.finsMemoryAreadWrite(area, position, bitpos, 1, new []{(byte) 1}))
 				{
 					throw new Exception(plc.LastError);
 				}
 
-				dialog.Text = plc.LastDialog("WRITE CIO Bit");
+				dialog.Text = plc.LastDialog("RAISE BIT");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("WriteCIOBit() error: " + ex.Message);
+				MessageBox.Show("ReadBit() error: " + ex.Message);
 			}
 		}
 
 
+		private void UpdateNodesEnabled()
+        {
+			if (plc != null && plc.Connected)
+				return;
+
+			mcOMRON.TransportType transportType = (mcOMRON.TransportType)transport_type.SelectedItem;
+
+			if (transportType == mcOMRON.TransportType.Tcp)
+			{
+				destination_node.Enabled = false;
+				source_node.Enabled = false;
+			}
+			else
+            {
+				destination_node.Enabled = true;
+				source_node.Enabled = true;
+			}
+		}
+		
 
 		#region **** controls events
 		
@@ -332,24 +425,29 @@ namespace test_plc
 			Exit();
 		}
 
-		private void bt_read_dm_Click(object sender, EventArgs e)
+		private void bt_read_word_Click(object sender, EventArgs e)
 		{
-			ReadDM();
+			ReadWord();
 		}
 
-		private void bt_write_dm_Click(object sender, EventArgs e)
+		private void bt_write_word_Click(object sender, EventArgs e)
 		{
-			WriteDM();
+			WriteWord();
 		}
 
-		private void bt_read_dms_Click(object sender, EventArgs e)
+		private void bt_read_bit_Click(object sender, EventArgs e)
 		{
-			ReadDMs();
+			ReadBit();
 		}
 
-		private void bt_clear_dms_Click(object sender, EventArgs e)
+		private void bt_clear_bit_Click(object sender, EventArgs e)
 		{
-			ClearDMs();
+			ClearBit();
+		}
+		
+		private void bt_raise_bit_Click(object sender, EventArgs e)
+		{
+			RaiseBit();
 		}
 
 		private void bt_connection_data_read_Click(object sender, EventArgs e)
@@ -357,17 +455,11 @@ namespace test_plc
 			ControllerDataRead();
 		}
 
-		private void bt_read_cio_Click(object sender, EventArgs e)
+		private void transport_type_SelectionChangeCommitted(object sender, EventArgs e)
 		{
-			ReadCIOBit();
-		}
-
-		private void bt_write_cio_Click(object sender, EventArgs e)
-		{
-			WriteCIOBit();
+			UpdateNodesEnabled();
 		}
 
 		#endregion
-		
 	}
 }

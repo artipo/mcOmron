@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 
 
 namespace mcOMRON
@@ -11,7 +8,8 @@ namespace mcOMRON
 	/// </summary>
 	public enum TransportType
 	{
-		Tcp
+		Tcp,
+		Udp
 	};
 
 
@@ -86,6 +84,9 @@ namespace mcOMRON
 			{
 				case TransportType.Tcp:
 					this._finsCmd = new tcpFINSCommand();
+					break;
+				case TransportType.Udp:
+					this._finsCmd = new udpFINSCommand();
 					break;
 				default:
 					throw new Exception("Transport type not defined.");

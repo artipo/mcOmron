@@ -56,7 +56,7 @@ namespace mcOMRON
 		/// </summary>
 		/// <param name="ip"></param>
 		/// <param name="port"></param>
-		public void SetTCPParams(IPAddress ip, int port)
+		public void SetUdpParams(IPAddress ip, int port)
 		{
 			this._endPoint.Address = ip;
 			this._endPoint.Port = port;
@@ -76,7 +76,7 @@ namespace mcOMRON
 		{
 			// build the socket object
 			//
-			this._socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Udp);
+			this._socket = new Socket(_endPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 			this._socket.SendTimeout = this._timeout;
 
 			// try to connect
