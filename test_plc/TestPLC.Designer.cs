@@ -43,8 +43,10 @@ namespace test_plc
             System.Windows.Forms.Label label14;
             System.Windows.Forms.Label label7;
             System.Windows.Forms.Label label8;
+            System.Windows.Forms.Label label9;
             this.left_panel = new System.Windows.Forms.Panel();
             this.groupBit = new System.Windows.Forms.GroupBox();
+            this.bit_value = new System.Windows.Forms.CheckBox();
             this.bt_raise_bit = new System.Windows.Forms.Button();
             this.bit_bit_position = new System.Windows.Forms.TextBox();
             this.bit_memory_area = new System.Windows.Forms.ComboBox();
@@ -52,6 +54,8 @@ namespace test_plc
             this.bt_read_bit = new System.Windows.Forms.Button();
             this.bit_position = new System.Windows.Forms.TextBox();
             this.groupWord = new System.Windows.Forms.GroupBox();
+            this.word_repetition = new System.Windows.Forms.TextBox();
+            this.bt_speed_test = new System.Windows.Forms.Button();
             this.word_count = new System.Windows.Forms.TextBox();
             this.word_memory_area = new System.Windows.Forms.ComboBox();
             this.bt_write_word = new System.Windows.Forms.Button();
@@ -71,7 +75,6 @@ namespace test_plc
             this.right_panel = new System.Windows.Forms.Panel();
             this.groupDialogText = new System.Windows.Forms.GroupBox();
             this.dialog = new System.Windows.Forms.TextBox();
-            this.bit_value = new System.Windows.Forms.CheckBox();
             label6 = new System.Windows.Forms.Label();
             label3 = new System.Windows.Forms.Label();
             label2 = new System.Windows.Forms.Label();
@@ -85,6 +88,7 @@ namespace test_plc
             label14 = new System.Windows.Forms.Label();
             label7 = new System.Windows.Forms.Label();
             label8 = new System.Windows.Forms.Label();
+            label9 = new System.Windows.Forms.Label();
             this.left_panel.SuspendLayout();
             this.groupBit.SuspendLayout();
             this.groupWord.SuspendLayout();
@@ -201,6 +205,24 @@ namespace test_plc
             label7.TabIndex = 13;
             label7.Text = "Transport Type:";
             // 
+            // label8
+            // 
+            label8.AutoSize = true;
+            label8.Location = new System.Drawing.Point(260, 32);
+            label8.Name = "label8";
+            label8.Size = new System.Drawing.Size(49, 15);
+            label8.TabIndex = 17;
+            label8.Text = "Value:";
+            // 
+            // label9
+            // 
+            label9.AutoSize = true;
+            label9.Location = new System.Drawing.Point(7, 108);
+            label9.Name = "label9";
+            label9.Size = new System.Drawing.Size(84, 15);
+            label9.TabIndex = 20;
+            label9.Text = "Repetition:";
+            // 
             // left_panel
             // 
             this.left_panel.Controls.Add(this.groupBit);
@@ -229,12 +251,21 @@ namespace test_plc
             this.groupBit.Controls.Add(label6);
             this.groupBit.Dock = System.Windows.Forms.DockStyle.Top;
             this.groupBit.Enabled = false;
-            this.groupBit.Location = new System.Drawing.Point(5, 384);
+            this.groupBit.Location = new System.Drawing.Point(5, 458);
             this.groupBit.Name = "groupBit";
             this.groupBit.Size = new System.Drawing.Size(347, 118);
             this.groupBit.TabIndex = 2;
             this.groupBit.TabStop = false;
             this.groupBit.Text = "Bit";
+            // 
+            // bit_value
+            // 
+            this.bit_value.AutoSize = true;
+            this.bit_value.Location = new System.Drawing.Point(263, 54);
+            this.bit_value.Name = "bit_value";
+            this.bit_value.Size = new System.Drawing.Size(15, 14);
+            this.bit_value.TabIndex = 22;
+            this.bit_value.UseVisualStyleBackColor = true;
             // 
             // bt_raise_bit
             // 
@@ -292,6 +323,9 @@ namespace test_plc
             // 
             // groupWord
             // 
+            this.groupWord.Controls.Add(this.word_repetition);
+            this.groupWord.Controls.Add(label9);
+            this.groupWord.Controls.Add(this.bt_speed_test);
             this.groupWord.Controls.Add(this.word_count);
             this.groupWord.Controls.Add(label13);
             this.groupWord.Controls.Add(this.word_memory_area);
@@ -306,10 +340,29 @@ namespace test_plc
             this.groupWord.Enabled = false;
             this.groupWord.Location = new System.Drawing.Point(5, 266);
             this.groupWord.Name = "groupWord";
-            this.groupWord.Size = new System.Drawing.Size(347, 118);
+            this.groupWord.Size = new System.Drawing.Size(347, 192);
             this.groupWord.TabIndex = 1;
             this.groupWord.TabStop = false;
             this.groupWord.Text = "Word";
+            // 
+            // word_repetition
+            // 
+            this.word_repetition.Location = new System.Drawing.Point(10, 126);
+            this.word_repetition.Name = "word_repetition";
+            this.word_repetition.Size = new System.Drawing.Size(75, 23);
+            this.word_repetition.TabIndex = 19;
+            this.word_repetition.Text = "0";
+            // 
+            // bt_speed_test
+            // 
+            this.bt_speed_test.Enabled = false;
+            this.bt_speed_test.Location = new System.Drawing.Point(10, 155);
+            this.bt_speed_test.Name = "bt_speed_test";
+            this.bt_speed_test.Size = new System.Drawing.Size(95, 23);
+            this.bt_speed_test.TabIndex = 18;
+            this.bt_speed_test.Text = "Speed Test";
+            this.bt_speed_test.UseVisualStyleBackColor = true;
+            this.bt_speed_test.Click += new System.EventHandler(this.bt_speed_test_Click);
             // 
             // word_count
             // 
@@ -501,24 +554,6 @@ namespace test_plc
             this.dialog.Size = new System.Drawing.Size(493, 629);
             this.dialog.TabIndex = 0;
             // 
-            // bit_value
-            // 
-            this.bit_value.AutoSize = true;
-            this.bit_value.Location = new System.Drawing.Point(263, 54);
-            this.bit_value.Name = "bit_value";
-            this.bit_value.Size = new System.Drawing.Size(15, 14);
-            this.bit_value.TabIndex = 22;
-            this.bit_value.UseVisualStyleBackColor = true;
-            // 
-            // label8
-            // 
-            label8.AutoSize = true;
-            label8.Location = new System.Drawing.Point(260, 32);
-            label8.Name = "label8";
-            label8.Size = new System.Drawing.Size(49, 15);
-            label8.TabIndex = 17;
-            label8.Text = "Value:";
-            // 
             // TestPLC
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -574,5 +609,7 @@ namespace test_plc
         private System.Windows.Forms.Button bt_raise_bit;
         private System.Windows.Forms.ComboBox transport_type;
         private System.Windows.Forms.CheckBox bit_value;
+        private System.Windows.Forms.Button bt_speed_test;
+        private System.Windows.Forms.TextBox word_repetition;
     }
 }

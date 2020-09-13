@@ -56,7 +56,7 @@ namespace mcOMRON
 		/// </summary>
 		/// <param name="ip"></param>
 		/// <param name="port"></param>
-		public void SetUdpParams(IPAddress ip, int port)
+		public void SetUDPParams(IPAddress ip, int port)
 		{
 			this._endPoint.Address = ip;
 			this._endPoint.Port = port;
@@ -78,6 +78,7 @@ namespace mcOMRON
 			//
 			this._socket = new Socket(_endPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 			this._socket.SendTimeout = this._timeout;
+			this._socket.ReceiveTimeout = this._timeout;
 
 			// try to connect
 			//
@@ -97,7 +98,7 @@ namespace mcOMRON
 			if (this._socket == null) return;
 			if (this.Connected)
 			{
-				this._socket.Disconnect(false);
+				this._socket.Shutdown(SocketShutdown.Both);
 				this._socket.Close();
 			}
 			this._socket.Dispose();

@@ -1,5 +1,6 @@
 ﻿using mcOMRON;
 using System;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Windows.Forms;
@@ -114,7 +115,7 @@ namespace test_plc
 						int da1 = Convert.ToInt32(destination_node.Text);
 						
 						udpFINSCommand udpFinsCommand = (udpFINSCommand) plc.FinsCommand;
-						udpFinsCommand.SetUdpParams(ipAddress, port, sa1, da1);
+						udpFinsCommand.SetUDPParams(ipAddress, port, sa1, da1);
 						
 						break;
 				}
@@ -144,6 +145,7 @@ namespace test_plc
 				transport_type.Enabled = false;
 				bt_close.Enabled = true;
 				bt_connection_data_read.Enabled = true;
+				bt_speed_test.Enabled = true;
 				groupWord.Enabled = true;
 				groupBit.Enabled = true;
 				groupDialogText.Enabled = true;
@@ -170,6 +172,7 @@ namespace test_plc
 			transport_type.Enabled = true;
 			bt_close.Enabled = false;
 			bt_connection_data_read.Enabled = false;
+			bt_speed_test.Enabled = false;
 			groupWord.Enabled = false;
 			groupBit.Enabled = false;
 			groupDialogText.Enabled = false;
@@ -280,6 +283,49 @@ namespace test_plc
 			catch (Exception ex)
 			{
 				MessageBox.Show("ControllerDataRead() error: " + ex.Message);
+			}
+		}
+
+
+		/// <summary>
+		/// Speed test
+		/// </summary>
+		private void SpeedTest()
+		{
+			if (string.IsNullOrWhiteSpace(word_position.Text) ||
+			    string.IsNullOrWhiteSpace(word_count.Text) ||
+				string.IsNullOrWhiteSpace(word_repetition.Text))
+				return;
+
+			var stopwatch = Stopwatch.StartNew();
+			
+			try
+			{
+				MemoryArea area = (MemoryArea) word_memory_area.SelectedItem;
+				UInt16 position = Convert.ToUInt16(word_position.Text);
+				UInt16 count = Convert.ToUInt16(word_count.Text);
+				int repetition = Convert.ToInt32(word_repetition.Text);
+
+				for (var i = 0; i < repetition; i++)
+				{
+					if (! plc.finsMemoryAreadRead(area, position, 0, count))
+					{
+						throw new Exception(plc.LastError);
+					}
+				}
+
+				stopwatch.Stop();
+
+				dialog.Text = $"Elapsed = {stopwatch.Elapsed.TotalMilliseconds} ms";
+				dialog.AppendText(Environment.NewLine);
+				dialog.AppendText($"Per iter = {stopwatch.Elapsed.TotalMilliseconds / repetition} ms");
+			}
+			catch (Exception ex)
+			{
+				if (stopwatch.IsRunning)
+					stopwatch.Stop();
+
+				MessageBox.Show("SpeedTest() Error: " + ex.Message);
 			}
 		}
 
@@ -460,6 +506,11 @@ namespace test_plc
 			UpdateNodesEnabled();
 		}
 
-		#endregion
-	}
+		private void bt_speed_test_Click(object sender, EventArgs e)
+		{
+			SpeedTest();
+		}
+
+        #endregion
+    }
 }

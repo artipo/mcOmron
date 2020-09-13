@@ -187,44 +187,6 @@ namespace mcOMRON
 		#region **** frame send command & response fields
 
 		/// <summary>
-		/// FRAME SEND command length
-		/// </summary>
-		public UInt16 FS_LEN
-		{
-			get { return BTool.BytesToUInt16(this.cmdFS[6], this.cmdFS[7]); }
-			set
-			{
-				this.cmdFS[6] = (Byte)((value >> 8) & 0xFF);
-				this.cmdFS[7] = (Byte)(value & 0xFF);
-			}
-		}
-
-
-		/// <summary>
-		/// FRAME SEND response length
-		/// </summary>
-		public UInt16 FSR_LEN
-		{
-			get { return BTool.BytesToUInt16(this.respFS[6], this.respFS[7]); }
-		}
-
-
-		/// <summary>
-		/// FRAME SEND response error
-		/// </summary>
-		public string FSR_ERR
-		{
-			get
-			{
-				return respFS[8].ToString()
-						+ respFS[9].ToString()
-						+ respFS[10].ToString()
-						+ respFS[11].ToString();
-			}
-		}
-
-
-		/// <summary>
 		/// FRAME SEND response main code error
 		/// </summary>
 		public Byte FSR_MER
@@ -271,12 +233,12 @@ namespace mcOMRON
 		/// </summary>
 		/// <param name="ip"></param>
 		/// <param name="port"></param>
-		public void SetUdpParams(IPAddress ip, int port, int sa1, int da1)
+		public void SetUDPParams(IPAddress ip, int port, int sa1, int da1)
 		{
 			this.DA1 = Convert.ToByte(da1);
 			this.SA1 = Convert.ToByte(sa1);
 			
-			this._transport.SetUdpParams(ip, port);
+			this._transport.SetUDPParams(ip, port);
 		}
 
 		#endregion
@@ -357,6 +319,10 @@ namespace mcOMRON
 				// set command lenght (12 + additional params)
 				//
 				this.finsCommandLen = 18;
+				
+				// set response lenght (14 + data)
+				//
+				this.finsResponseLen = Convert.ToUInt16(14 + count * 2);
 
 				// send the message
 				//
@@ -408,6 +374,10 @@ namespace mcOMRON
 				// set command lenght (12 + additional params)
 				//
 				this.finsCommandLen = 18;
+				
+				// set response lenght (14 + data)
+				//
+				this.finsResponseLen = 14;
 
 				// send the message
 				//
@@ -443,6 +413,21 @@ namespace mcOMRON
 				//
 				this.finsCommandLen = 13;
 
+				// set response lenght (14 + data)
+				//
+				if (area == 0)
+				{
+					this.finsResponseLen = Convert.ToUInt16(14 + 92);
+				}
+				else if (area == 1)
+				{
+					this.finsResponseLen = Convert.ToUInt16(14 + 66);
+				}
+				else
+				{
+					this.finsResponseLen = Convert.ToUInt16(14 + 158);
+				}
+				
 				return FrameSend(null);
 			}
 			catch (Exception ex)
@@ -464,30 +449,6 @@ namespace mcOMRON
 		/// <returns></returns>
 		private bool FrameSend(Byte[] data)
 		{
-			// clear FS response buffer
-			//
-			for (int x = 0; x < this.respFS.Length; respFS[x++] = 0);
-
-
-			// data lenght plus 8 bytes (4 bytes for command & 4 bytes for error)
-			//
-			int fsLen = this.finsCommandLen + 8;
-			if (data != null)
-			{
-				fsLen += data.Length;
-			}
-
-
-			// set length [6]+[7]
-			//
-			this.FS_LEN = (UInt16)fsLen;
-
-
-			// send frame header
-			//
-			this.Transport.Send(ref cmdFS, cmdFS.Length);
-
-
 			// send FINS command
 			//
 			this.Transport.Send(ref this.cmdFins, this.finsCommandLen);
@@ -501,48 +462,17 @@ namespace mcOMRON
 			}
 
 
-			// frame response
-			//
-			this.Transport.Receive(ref this.respFS, this.respFS.Length);
-
-
-			// check frame error [8]+[9]+[10]+[11]
-			//
-			if (this.FSR_ERR != "0002")
-			{
-				this._lastError = "FRAME SEND error: " + this.FSR_ERR;
-				return false;
-			}
-
-
-			// checks response error
-			//
-			if (this.respFS[15] != 0)
-			{
-				this._lastError = "Error receving FS command: " + this.respFS[15];
-				return false;
-			}
-
-
-			// calculate the expedted response lenght
-			//
-			// 16 bits word ([6] + [7])
-			// substract the additional 8 bytes
-			//
-			this.finsResponseLen = this.FSR_LEN;
-			this.finsResponseLen -= 8;
-
-
 			// fins command response
 			//
-			this.Transport.Receive(ref respFins, 14);
+			this.Transport.Receive(ref this.respFins, this.finsResponseLen);
 
-
+			
 			if (finsResponseLen > 14)
 			{
-				// fins command response data
-				//
-				this.Transport.Receive(ref respFinsData, finsResponseLen - 14);
+				for (int x = 0; x < this.finsResponseLen - 14; x++)
+				{
+					this.respFinsData[x] = this.respFins[x + 14];
+				}
 			}
 
 
@@ -575,12 +505,8 @@ namespace mcOMRON
 		{
 			StringBuilder dialog = new StringBuilder(Caption + Environment.NewLine);
 			dialog.Append(Environment.NewLine);
-			dialog.Append("FS HEADER" + Environment.NewLine);
-			dialog.Append(BitConverter.ToString(this.cmdFS) + Environment.NewLine);
 			dialog.Append("FINS COMMAND" + Environment.NewLine);
 			dialog.Append(BitConverter.ToString(this.cmdFins,0,finsCommandLen) + Environment.NewLine);
-			dialog.Append("FS RESPONSE" + Environment.NewLine);
-			dialog.Append(BitConverter.ToString(this.respFS) + Environment.NewLine);
 			dialog.Append("FINS RESPONSE" + Environment.NewLine);
 			dialog.Append(BitConverter.ToString(this.respFins, 0, 14) + Environment.NewLine);
 			dialog.Append("FINS DATA" + Environment.NewLine);
@@ -607,33 +533,10 @@ namespace mcOMRON
 		mcOMRON.udpTransport _transport = null;
 
 
-		// FRAME SEND header array
-		//
-		Byte[] cmdFS = new Byte[] 
-		{
-			0x46, 0x49, 0x4E, 0x53,		// 'F' 'I' 'N' 'S'
-			0x00, 0x00, 0x00, 0x00,		// Expected number of bytes for response
-			0x00, 0x00, 0x00, 0x02,		// Command FS  Sending=2 / Receiving=3
-			0x00, 0x00, 0x00, 0x00		// Error code
-		};
-
-
-		// FRAME SEND Response array
-		//
-		Byte[] respFS = new Byte[]
-			{
-			0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00
-			};
-
-
 		// FINS RESPONSE (command)
 		//
 		Byte[] respFins = new Byte[2048];
-
-
+		
 		// FINS RESPONSE (data, 2KB reserved memory)
 		//
 		Byte[] respFinsData = new Byte[2048];
